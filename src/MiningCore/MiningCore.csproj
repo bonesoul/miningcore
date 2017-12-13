@@ -33,6 +33,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="config.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="config.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Autofac" Version="4.6.2" />
     <PackageReference Include="AutoMapper" Version="6.2.1" />
     <PackageReference Include="Dapper" Version="1.50.4" />
@@ -45,6 +55,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="2.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="2.0.0" />
     <PackageReference Include="NBitcoin" Version="4.0.0.47" />
+    <PackageReference Include="NetMQ" Version="4.0.0.1" />
     <PackageReference Include="NetUV.Core" Version="0.1.125" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
     <PackageReference Include="NLog" Version="5.0.0-beta09" />

@@ -46,8 +46,9 @@ namespace MiningCore.Configuration
         VTC, // Vertcoin
         BTG, // Bitcoin Gold
         GLT, // Globaltoken
-        ELLA, // Ellaism
+        ELLA, //Ellaism
         AEON, // AEON
+        STAK //Straks
     }
 
     public class CoinConfig
@@ -107,7 +108,7 @@ namespace MiningCore.Configuration
         public string Name { get; set; }
         public double Difficulty { get; set; }
         public VarDiffConfig VarDiff { get; set; }
-    }
+	}
 
     public partial class VarDiffConfig
     {
@@ -245,7 +246,11 @@ namespace MiningCore.Configuration
         public int JobRebroadcastTimeout { get; set; }
         public int BlockRefreshInterval { get; set; }
 
-        [JsonExtensionData]
+		public bool ExternalStratum { get; set; }
+	    public string ExternalStratumZmqSocket { get; set; }
+	    public string ExternalStratumZmqTopic { get; set; }
+
+		[JsonExtensionData]
         public IDictionary<string, object> Extra { get; set; }
     }
 

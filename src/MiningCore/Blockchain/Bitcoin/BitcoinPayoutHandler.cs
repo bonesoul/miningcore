@@ -45,7 +45,7 @@ namespace MiningCore.Blockchain.Bitcoin
         CoinType.BTC, CoinType.BCC, CoinType.NMC, CoinType.PPC,
         CoinType.LTC, CoinType.DOGE, CoinType.DGB, CoinType.VIA,
         CoinType.GRS, CoinType.DASH, CoinType.MONA, CoinType.VTC,
-        CoinType.BTG, CoinType.GLT)]
+        CoinType.BTG, CoinType.GLT, CoinType.STAK)]
     public class BitcoinPayoutHandler : PayoutHandlerBase,
         IPayoutHandler
     {
@@ -70,6 +70,7 @@ namespace MiningCore.Blockchain.Bitcoin
 
         protected readonly IComponentContext ctx;
         protected DaemonClient daemon;
+        private BitcoinCoinProperties coinProperties;
 
         protected override string LogCategory => "Bitcoin Payout Handler";
 
@@ -81,6 +82,8 @@ namespace MiningCore.Blockchain.Bitcoin
 
             this.poolConfig = poolConfig;
             this.clusterConfig = clusterConfig;
+
+            coinProperties = BitcoinProperties.GetCoinProperties(poolConfig.Coin.Type, poolConfig.Coin.Algorithm);
 
             logger = LogUtil.GetPoolScopedLogger(typeof(BitcoinPayoutHandler), poolConfig);
 
@@ -151,7 +154,10 @@ namespace MiningCore.Blockchain.Bitcoin
                         {
                             case "immature":
                                 // update progress
-                                block.ConfirmationProgress = Math.Min(1.0d, (double) transactionInfo.Confirmations / BitcoinConstants.CoinbaseMinConfimations);
+                                var minConfirmations = poolConfig.Extra?.ContainsKey("minimumConfirmations") == true
+                                    ? int.Parse(poolConfig.Extra["minimumConfirmations"].ToString())
+                                    : BitcoinConstants.CoinbaseMinConfimations;
+                                block.ConfirmationProgress = Math.Min(1.0d, (double) transactionInfo.Confirmations / minConfirmations);
                                 result.Add(block);
                                 break;
 
@@ -165,7 +171,9 @@ namespace MiningCore.Blockchain.Bitcoin
                                 break;
 
                             default:
-                                block.Status = BlockStatus.Orphaned;
+	                            logger.Info(() => $"[{LogCategory}] Block {block.BlockHeight} classified as orphaned. Category: {transactionInfo.Details[0].Category}");
+
+								block.Status = BlockStatus.Orphaned;
                                 result.Add(block);
                                 break;
                         }
@@ -222,7 +230,7 @@ namespace MiningCore.Blockchain.Bitcoin
 
             var args = new object[]
             {
-                string.Empty,           // default account
+                string.Empty,          
                 amounts                // addresses and associated amounts
             };
 
