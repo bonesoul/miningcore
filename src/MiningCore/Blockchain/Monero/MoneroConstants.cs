@@ -41,7 +41,15 @@ namespace MiningCore.Blockchain.Monero
         public static readonly Dictionary<CoinType, int> AddressLength = new Dictionary<CoinType, int>
         {
             { CoinType.XMR, 95 },
+            { CoinType.ETN, 98 },
             { CoinType.AEON, 97 },
+        };
+
+        public static readonly Dictionary<CoinType, decimal> SmallestUnit = new Dictionary<CoinType, decimal>
+        {
+            { CoinType.XMR, Piconero },
+            { CoinType.ETN, 100m }, // BUG: https://github.com/electroneum/electroneum/issues/77
+            { CoinType.AEON, Piconero },
         };
 
         public const string DaemonRpcLocation = "json_rpc";
@@ -53,7 +61,6 @@ namespace MiningCore.Blockchain.Monero
 
         public static readonly BigInteger Diff1 = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
         public static readonly System.Numerics.BigInteger Diff1b = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF".HexToByteArray().ToBigInteger();
-        public const string DevAddress = "475YVJbPHPedudkhrcNp1wDcLMTGYusGPF5fqE7XjnragVLPdqbCHBdZg3dF4dN9hXMjjvGbykS6a77dTAQvGrpiQqHp2eH";
 
 #if DEBUG
         public const int PayoutMinBlockConfirmations = 2;

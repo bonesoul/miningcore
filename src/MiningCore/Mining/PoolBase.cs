@@ -81,7 +81,7 @@ namespace MiningCore.Mining
                 .Synchronize();
         }
 
-        protected readonly PoolStats poolStats = new PoolStats();
+        protected PoolStats poolStats = new PoolStats();
         protected readonly JsonSerializerSettings serializerSettings;
         protected readonly NotificationService notificationService;
         protected readonly IConnectionFactory cf;
@@ -104,12 +104,6 @@ namespace MiningCore.Mining
 
         protected override void OnConnect(StratumClient client)
         {
-            // update stats
-            lock(clients)
-            {
-                poolStats.ConnectedMiners = clients.Count;
-            }
-
             // client setup
             var context = CreateClientContext();
 
@@ -120,79 +114,14 @@ namespace MiningCore.Mining
             // varDiff setup
             if (context.VarDiff != null)
             {
-                // get or create manager
-                lock(varDiffManagers)
+                lock (context.VarDiff)
                 {
-                    if (!varDiffManagers.TryGetValue(poolEndpoint, out var varDiffManager))
-                    {
-                        varDiffManager = new VarDiffManager(poolEndpoint.VarDiff, clock);
-                        varDiffManagers[poolEndpoint] = varDiffManager;
-                    }
-                }
-
-                // wire updates
-                lock(context.VarDiff)
-                {
-                    context.VarDiff.Subscription = Shares
-                        .Where(x => x.Client == client)
-                        .Timestamp()
-                        .Select(x => x.Timestamp.ToUnixTimeMilliseconds())
-                        .Buffer(TimeSpan.FromSeconds(poolEndpoint.VarDiff.RetargetTime), VarDiffSampleCount)
-                        .Subscribe(timestamps =>
-                        {
-                            try
-                            {
-                                VarDiffManager varDiffManager;
-
-                                lock(varDiffManagers)
-                                {
-                                    varDiffManager = varDiffManagers[poolEndpoint];
-                                }
-
-                                var newDiff = varDiffManager.Update(context, timestamps, client.ConnectionId, logger);
-
-                                if (newDiff.HasValue)
-                                {
-                                    logger.Info(() => $"[{LogCat}] [{client.ConnectionId}] VarDiff update to {Math.Round(newDiff.Value, 2)}");
-
-                                    OnVarDiffUpdate(client, newDiff.Value);
-                                }
-                            }
-
-                            catch(Exception ex)
-                            {
-                                logger.Error(ex);
-                            }
-                        });
+                    StartVarDiffIdleUpdate(client, poolEndpoint);
                 }
             }
 
             // expect miner to establish communication within a certain time
             EnsureNoZombieClient(client);
-        }
-
-        protected override void DisconnectClient(StratumClient client)
-        {
-            var context = client.GetContextAs<WorkerContextBase>();
-
-            if (context.VarDiff != null)
-            {
-                lock(context.VarDiff)
-                {
-                    context.VarDiff.Dispose();
-                }
-            }
-
-            base.DisconnectClient(client);
-        }
-
-        protected override void OnDisconnect(string subscriptionId)
-        {
-            // update stats
-            lock(clients)
-            {
-                poolStats.ConnectedMiners = clients.Count;
-            }
         }
 
         private void EnsureNoZombieClient(StratumClient client)
@@ -290,9 +219,66 @@ namespace MiningCore.Mining
 			thread.Start();
 	    }
 
-		#region VarDiff
+        #region VarDiff
 
-		protected virtual void OnVarDiffUpdate(StratumClient client, double newDiff)
+        protected void UpdateVarDiff(StratumClient client, bool isIdleUpdate = false)
+        {
+            var context = client.GetContextAs<WorkerContextBase>();
+
+            if (context.VarDiff != null)
+            {
+                logger.Debug(() => $"[{LogCat}] [{client.ConnectionId}] Updating VarDiff" + (isIdleUpdate ? " [idle]" : string.Empty));
+
+                // get or create manager
+                VarDiffManager varDiffManager;
+                var poolEndpoint = poolConfig.Ports[client.PoolEndpoint.Port];
+
+                lock (varDiffManagers)
+                {
+                    if (!varDiffManagers.TryGetValue(poolEndpoint, out varDiffManager))
+                    {
+                        varDiffManager = new VarDiffManager(poolEndpoint.VarDiff, clock);
+                        varDiffManagers[poolEndpoint] = varDiffManager;
+                    }
+                }
+
+                lock (context.VarDiff)
+                {
+                    StartVarDiffIdleUpdate(client, poolEndpoint);
+
+                    // update it
+                    var newDiff = varDiffManager.Update(context.VarDiff, context.Difficulty, isIdleUpdate);
+
+                    if (newDiff != null)
+                    {
+                        logger.Info(() => $"[{LogCat}] [{client.ConnectionId}] VarDiff update to {Math.Round(newDiff.Value, 2)}");
+
+                        OnVarDiffUpdate(client, newDiff.Value);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Wire interval based vardiff updates for client
+        /// WARNING: Assumes to be invoked with lock held on context.VarDiff
+        /// </summary>
+        private void StartVarDiffIdleUpdate(StratumClient client, PoolEndpoint poolEndpoint)
+        {
+            // Check Every Target Time as we adjust the diff to meet target
+            // Diff may not be changed , only be changed when avg is out of the range.
+            // Diff must be dropped once changed. Will not affect reject rate.
+            var interval = poolEndpoint.VarDiff.TargetTime;
+
+            Observable
+                .Timer(TimeSpan.FromSeconds(interval))
+                .TakeUntil(Shares.Where(x=> x.Client == client))
+                .Take(1)
+                .Where(x=> client.IsAlive)
+                .Subscribe(_ => UpdateVarDiff(client, true));
+        }
+
+        protected virtual void OnVarDiffUpdate(StratumClient client, double newDiff)
         {
             var context = client.GetContextAs<WorkerContextBase>();
             context.EnqueueNewDifficulty(newDiff);
@@ -309,39 +295,9 @@ namespace MiningCore.Mining
             }
         }
 
-        protected virtual void SetupStats()
+        protected virtual void InitStats()
         {
             LoadStats();
-
-            // Periodically persist pool- and blockchain-stats to persistent storage
-            disposables.Add(Observable.Interval(TimeSpan.FromSeconds(60))
-                .Select(_ => Observable.FromAsync(async () =>
-                {
-                    try
-                    {
-                        await UpdateBlockChainStatsAsync();
-                    }
-                    catch(Exception)
-                    {
-                        // ignored
-                    }
-                }))
-                .Concat()
-                .Subscribe(_ => PersistStats()));
-
-            // For external stratums, miner counts are derived from submitted shares
-            if (poolConfig.ExternalStratum)
-            {
-                disposables.Add(Shares
-                    .Buffer(TimeSpan.FromMinutes(1))
-                    .Do(shares =>
-                    {
-                        var sharesByMiner = shares.GroupBy(x => x.Share.Miner).ToArray();
-                        poolStats.ConnectedMiners = sharesByMiner.Length;
-                    })
-                    .Subscribe());
-
-            }
         }
 
         protected abstract Task UpdateBlockChainStatsAsync();
@@ -355,37 +311,12 @@ namespace MiningCore.Mining
                 var stats = cf.Run(con => statsRepo.GetLastPoolStats(con, poolConfig.Id));
 
                 if (stats != null)
-                {
-                    poolStats.ConnectedMiners = stats.ConnectedMiners;
-                    poolStats.PoolHashRate = (ulong) stats.PoolHashRate;
-                }
+                    poolStats = mapper.Map<PoolStats>(stats);
             }
 
             catch (Exception ex)
             {
                 logger.Warn(ex, () => $"[{LogCat}] Unable to load pool stats");
-            }
-        }
-
-        private void PersistStats()
-        {
-            try
-            {
-                logger.Debug(() => $"[{LogCat}] Persisting pool stats");
-
-                cf.RunTx((con, tx) =>
-                {
-                    var mapped = mapper.Map<Persistence.Model.PoolStats>(poolStats);
-                    mapped.PoolId = poolConfig.Id;
-                    mapped.Created = clock.Now;
-
-                    statsRepo.InsertPoolStats(con, tx, mapped);
-                });
-            }
-
-            catch(Exception ex)
-            {
-                logger.Error(ex, () => $"[{LogCat}] Unable to persist pool stats");
             }
         }
 
@@ -443,55 +374,6 @@ Pool Fee:               {poolConfig.RewardRecipients.Sum(x => x.Percentage)}%
             logger.Info(() => msg);
         }
 
-        protected abstract ulong HashrateFromShares(IEnumerable<ClientShare> shares, int interval);
-
-        protected virtual void UpdateMinerHashrates(IList<ClientShare> shares, int interval)
-        {
-            try
-            {
-                var sharesByMiner = shares.GroupBy(x => x.Share.Miner).ToArray();
-
-                foreach (var minerShares in sharesByMiner)
-                {
-                    // Total hashrate
-                    var miner = minerShares.Key;
-                    var hashRate = HashrateFromShares(minerShares, interval);
-
-                    var sample = new MinerHashrateSample
-                    {
-                        PoolId = poolConfig.Id,
-                        Miner = miner,
-                        Hashrate = hashRate,
-                        Created = clock.Now
-                    };
-
-                    // Per worker hashrates
-                    var sharesPerWorker = minerShares
-                        .GroupBy(x => x.Share.Worker)
-                        .Where(x => !string.IsNullOrEmpty(x.Key));
-
-                    foreach(var workerShares in sharesPerWorker)
-                    {
-                        var worker = workerShares.Key;
-                        hashRate = HashrateFromShares(workerShares, interval);
-
-                        if (sample.WorkerHashrates == null)
-                            sample.WorkerHashrates = new Dictionary<string, ulong>();
-
-                        sample.WorkerHashrates[worker] = hashRate;
-                    }
-
-                    // Persist
-                    cf.RunTx((con, tx) => { statsRepo.RecordMinerHashrateSample(con, tx, sample); });
-                }
-            }
-
-            catch(Exception ex)
-            {
-                logger.Error(ex);
-            }
-        }
-
         #region API-Surface
 
         public IObservable<ClientShare> Shares { get; }
@@ -508,6 +390,8 @@ Pool Fee:               {poolConfig.RewardRecipients.Sum(x => x.Percentage)}%
             this.poolConfig = poolConfig;
             this.clusterConfig = clusterConfig;
         }
+
+        public abstract ulong HashrateFromShares(double shares, double interval);
 
         public virtual async Task StartAsync()
         {
@@ -526,7 +410,7 @@ Pool Fee:               {poolConfig.RewardRecipients.Sum(x => x.Percentage)}%
 			            .Select(port => PoolEndpoint2IPEndpoint(port, poolConfig.Ports[port]))
 			            .ToArray();
 
-		            StartListeners(ipEndpoints);
+		            StartListeners(poolConfig.Id, ipEndpoints);
 	            }
 
 	            else
@@ -539,7 +423,7 @@ Pool Fee:               {poolConfig.RewardRecipients.Sum(x => x.Percentage)}%
 					StartExternalStratumPublisherListener();
 	            }
 
-	            SetupStats();
+	            InitStats();
                 await UpdateBlockChainStatsAsync();
 
                 logger.Info(() => $"[{LogCat}] Online");

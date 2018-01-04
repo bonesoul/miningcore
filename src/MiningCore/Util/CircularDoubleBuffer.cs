@@ -18,16 +18,38 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
+using System.Linq;
 
-namespace MiningCore.Persistence.Model
+namespace MiningCore.Util
 {
-    public class MinerStats
+    public class CircularDoubleBuffer : CircularBuffer<double>
     {
-        public ulong PendingShares { get; set; }
-        public decimal PendingBalance { get; set; }
-        public decimal TotalPaid { get; set; }
-        public Payment LastPayment { get; set; }
-        public MinerHashrateSample[] Hashrate { get; set; }
+        public CircularDoubleBuffer(int capacity) : base(capacity)
+        {
+        }
+
+        public CircularDoubleBuffer(int capacity, double[] items) : base(capacity, items)
+        {
+        }
+
+        public double Average()
+        {
+            return ToArray().Average();
+        }
+
+        public double Sum()
+        {
+            double sum = 0;
+            using (var enumerator = GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    sum += enumerator.Current;
+                }
+            }
+
+            return sum;
+        }
+
     }
 }

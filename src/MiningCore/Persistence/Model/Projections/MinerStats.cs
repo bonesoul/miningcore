@@ -21,7 +21,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 using System;
 using System.Collections.Generic;
 
-namespace MiningCore.Api.Responses
+namespace MiningCore.Persistence.Model.Projections
 {
     public class WorkerPerformanceStats
     {
@@ -40,8 +40,8 @@ namespace MiningCore.Api.Responses
         public ulong PendingShares { get; set; }
         public decimal PendingBalance { get; set; }
         public decimal TotalPaid { get; set; }
-        public DateTime? LastPayment { get; set; }
-        public string LastPaymentLink { get; set; }
+        public Payment LastPayment { get; set; }
         public WorkerPerformanceStatsContainer Performance { get; set; }
+        public MinerWorkerPerformanceStats[] PerformanceStats { get; set; }
     }
 }

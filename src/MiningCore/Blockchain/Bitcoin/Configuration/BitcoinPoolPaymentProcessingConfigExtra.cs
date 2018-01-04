@@ -18,30 +18,13 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-
-namespace MiningCore.Api.Responses
+namespace MiningCore.Blockchain.Bitcoin.Configuration
 {
-    public class WorkerPerformanceStats
+    public class BitcoinPoolPaymentProcessingConfigExtra
     {
-        public double Hashrate { get; set; }
-        public double SharesPerSecond { get; set; }
-    }
-
-    public class WorkerPerformanceStatsContainer
-    {
-        public DateTime Created { get; set; }
-        public Dictionary<string, WorkerPerformanceStats> Workers { get; set; }
-    }
-
-    public class MinerStats
-    {
-        public ulong PendingShares { get; set; }
-        public decimal PendingBalance { get; set; }
-        public decimal TotalPaid { get; set; }
-        public DateTime? LastPayment { get; set; }
-        public string LastPaymentLink { get; set; }
-        public WorkerPerformanceStatsContainer Performance { get; set; }
+        /// <summary>
+        /// if True, miners pay payment tx fees
+        /// </summary>
+        public bool MinersPayTxFees { get; set; }
     }
 }

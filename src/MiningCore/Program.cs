@@ -45,7 +45,6 @@ using MiningCore.Crypto.Hashing.Equihash;
 using MiningCore.Extensions;
 using MiningCore.Mining;
 using MiningCore.Native;
-using MiningCore.Notifications;
 using MiningCore.Payments;
 using MiningCore.Persistence.Postgres;
 using MiningCore.Persistence.Postgres.Repositories;
@@ -70,6 +69,7 @@ namespace MiningCore
         private static CommandOption shareRecoveryOption;
         private static ShareRecorder shareRecorder;
         private static PayoutManager payoutManager;
+        private static StatsRecorder statsRecorder;
         private static ClusterConfig clusterConfig;
         private static ApiServer apiServer;
 
@@ -237,7 +237,6 @@ namespace MiningCore
             builder.Register((ctx, parms) => amConf.CreateMapper());
 
             ConfigurePersistence(builder);
-            ConfigureNotifications(builder);
             container = builder.Build();
             ConfigureLogging();
             ConfigureMisc();
@@ -520,18 +519,6 @@ namespace MiningCore
                 .SingleInstance();
         }
 
-        private static void ConfigureNotifications(ContainerBuilder builder)
-        {
-            if (clusterConfig.Notifications != null && clusterConfig.Notifications.Enabled)
-            {
-                if (clusterConfig.Notifications?.Email != null)
-                {
-                    builder.RegisterInstance(new EmailSender(clusterConfig.Notifications.Email))
-                        .AsImplementedInterfaces();
-                }
-            }
-        }
-
         private static async Task Start()
         {
             // start share recorder
@@ -558,8 +545,13 @@ namespace MiningCore
 	        else
 		        logger.Info("Payment processing is not enabled");
 
-			// start pools
-			await Task.WhenAll(clusterConfig.Pools.Where(x => x.Enabled).Select(async poolConfig =>
+            // start pool stats updater
+            statsRecorder = container.Resolve<StatsRecorder>();
+            statsRecorder.Configure(clusterConfig);
+            statsRecorder.Start();
+
+            // start pools
+            await Task.WhenAll(clusterConfig.Pools.Where(x => x.Enabled).Select(async poolConfig =>
             {
                 // resolve pool implementation
                 var poolImpl = container.Resolve<IEnumerable<Meta<Lazy<IMiningPool, CoinMetadataAttribute>>>>()
@@ -571,6 +563,7 @@ namespace MiningCore
 
                 // pre-start attachments
                 shareRecorder.AttachPool(pool);
+                statsRecorder.AttachPool(pool);
 
                 await pool.StartAsync();
 

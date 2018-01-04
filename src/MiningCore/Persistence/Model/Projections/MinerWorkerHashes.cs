@@ -19,29 +19,16 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 using System;
-using System.Collections.Generic;
 
-namespace MiningCore.Api.Responses
+namespace MiningCore.Persistence.Model.Projections
 {
-    public class WorkerPerformanceStats
+    public class MinerWorkerHashes
     {
-        public double Hashrate { get; set; }
-        public double SharesPerSecond { get; set; }
-    }
-
-    public class WorkerPerformanceStatsContainer
-    {
-        public DateTime Created { get; set; }
-        public Dictionary<string, WorkerPerformanceStats> Workers { get; set; }
-    }
-
-    public class MinerStats
-    {
-        public ulong PendingShares { get; set; }
-        public decimal PendingBalance { get; set; }
-        public decimal TotalPaid { get; set; }
-        public DateTime? LastPayment { get; set; }
-        public string LastPaymentLink { get; set; }
-        public WorkerPerformanceStatsContainer Performance { get; set; }
+        public double Sum { get; set; }
+        public long Count { get; set; }
+        public string Miner { get; set; }
+        public string Worker { get; set; }
+        public DateTime FirstShare { get; set; }
+        public DateTime LastShare { get; set; }
     }
 }

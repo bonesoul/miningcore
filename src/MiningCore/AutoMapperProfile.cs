@@ -22,6 +22,8 @@ using AutoMapper;
 using MiningCore.Blockchain;
 using MiningCore.Configuration;
 using MiningCore.Persistence.Model;
+using MiningCore.Persistence.Model.Projections;
+using MinerStats = MiningCore.Persistence.Model.Projections.MinerStats;
 
 namespace MiningCore
 {
@@ -56,12 +58,18 @@ namespace MiningCore
                 .ForMember(dest => dest.LastPayment, opt => opt.Ignore())
                 .ForMember(dest => dest.LastPaymentLink, opt => opt.Ignore());
 
+            CreateMap<WorkerPerformanceStats, Api.Responses.WorkerPerformanceStats>();
+            CreateMap<WorkerPerformanceStatsContainer, Api.Responses.WorkerPerformanceStatsContainer>();
+
             // PostgreSQL
             CreateMap<Share, Persistence.Postgres.Entities.Share>();
             CreateMap<Block, Persistence.Postgres.Entities.Block>();
             CreateMap<Balance, Persistence.Postgres.Entities.Balance>();
             CreateMap<Payment, Persistence.Postgres.Entities.Payment>();
             CreateMap<PoolStats, Persistence.Postgres.Entities.PoolStats>();
+
+            CreateMap<MinerWorkerPerformanceStats, Persistence.Postgres.Entities.MinerWorkerPerformanceStats>()
+                .ForMember(dest => dest.Id, opt => opt.Ignore());
 
             //////////////////////
             // incoming mappings
@@ -72,6 +80,9 @@ namespace MiningCore
             CreateMap<Persistence.Postgres.Entities.Balance, Balance>();
             CreateMap<Persistence.Postgres.Entities.Payment, Payment>();
             CreateMap<Persistence.Postgres.Entities.PoolStats, PoolStats>();
+            CreateMap<Persistence.Postgres.Entities.MinerWorkerPerformanceStats, MinerWorkerPerformanceStats>();
+
+            CreateMap<PoolStats, Mining.PoolStats>();
         }
     }
 }

@@ -28,7 +28,7 @@ namespace MiningCore.Configuration
     {
         // ReSharper disable InconsistentNaming
         BTC = 1, // Bitcoin
-        BCC, // Bitcoin Cash
+        BCH, // Bitcoin Cash
         LTC, // Litecoin
         DOGE, // Dogecoin,
         XMR, // Monero
@@ -46,9 +46,10 @@ namespace MiningCore.Configuration
         VTC, // Vertcoin
         BTG, // Bitcoin Gold
         GLT, // Globaltoken
-        ELLA, //Ellaism
+        ELLA, // Ellaism
         AEON, // AEON
-        STAK //Straks
+        STAK, // Straks
+        ETN   // Electroneum
     }
 
     public class CoinConfig
@@ -108,7 +109,7 @@ namespace MiningCore.Configuration
         public string Name { get; set; }
         public double Difficulty { get; set; }
         public VarDiffConfig VarDiff { get; set; }
-	}
+    }
 
     public partial class VarDiffConfig
     {
@@ -216,6 +217,40 @@ namespace MiningCore.Configuration
         public bool NotifyPaymentSuccess { get; set; }
     }
 
+    public partial class SlackNotifications
+    {
+        public bool Enabled { get; set; }
+        public string WebHookUrl { get; set; }
+
+        /// <summary>
+        /// Optional default channel override - must start with '#'
+        /// </summary>
+        public string Channel { get; set; }
+
+        public bool NotifyBlockFound { get; set; }
+        public bool NotifyPaymentSuccess { get; set; }
+
+        /// <summary>
+        /// Override slack bot name for block found notifications - optional
+        /// </summary>
+        public string BlockFoundUsername { get; set; }
+
+        /// <summary>
+        /// Override slack bot name for payment notifications- optional
+        /// </summary>
+        public string PaymentSuccessUsername { get; set; }
+
+        /// <summary>
+        /// Override slack Emoji for block found notifications - optional
+        /// </summary>
+        public string BlockFoundEmoji { get; set; }
+
+        /// <summary>
+        /// Override slack Emoji for payment notifications- optional
+        /// </summary>
+        public string PaymentSuccessEmoji { get; set; }
+    }
+
     public partial class NotificationsConfig
     {
         public bool Enabled { get; set; }
@@ -234,6 +269,7 @@ namespace MiningCore.Configuration
     public partial class PoolConfig
     {
         public string Id { get; set; }
+        public string PoolName { get; set; }
         public bool Enabled { get; set; }
         public CoinConfig Coin { get; set; }
         public Dictionary<int, PoolEndpoint> Ports { get; set; }
@@ -241,21 +277,23 @@ namespace MiningCore.Configuration
         public PoolPaymentProcessingConfig PaymentProcessing { get; set; }
         public PoolShareBasedBanningConfig Banning { get; set; }
         public RewardRecipient[] RewardRecipients { get; set; }
+        public SlackNotifications SlackNotifications { get; set; }
         public string Address { get; set; }
         public int ClientConnectionTimeout { get; set; }
         public int JobRebroadcastTimeout { get; set; }
         public int BlockRefreshInterval { get; set; }
 
-		public bool ExternalStratum { get; set; }
-	    public string ExternalStratumZmqSocket { get; set; }
-	    public string ExternalStratumZmqTopic { get; set; }
+        public bool ExternalStratum { get; set; }
+        public string ExternalStratumZmqSocket { get; set; }
+        public string ExternalStratumZmqTopic { get; set; }
 
-		[JsonExtensionData]
+        [JsonExtensionData]
         public IDictionary<string, object> Extra { get; set; }
     }
 
     public partial class ClusterConfig
     {
+        public string ClusterName { get; set; }
         public ClusterLoggingConfig Logging { get; set; }
         public ClusterBanningConfig Banning { get; set; }
         public PersistenceConfig Persistence { get; set; }

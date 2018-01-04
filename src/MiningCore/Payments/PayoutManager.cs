@@ -143,11 +143,6 @@ namespace MiningCore.Payments
                                 break;
 
                             case BlockStatus.Orphaned:
-	                            logger.Info(() => $"Deleting orphaned block {block.BlockHeight} on pool {pool.Id}");
-
-								blockRepo.DeleteBlock(con, tx, block);
-                                break;
-
                             case BlockStatus.Pending:
                                 blockRepo.UpdateBlock(con, tx, block);
                                 break;
@@ -157,7 +152,7 @@ namespace MiningCore.Payments
             }
 
             else
-                logger.Info(() => $"No updated blocks for {pool.Id}");
+                logger.Info(() => $"No updated blocks for pool {pool.Id}");
         }
 
         private async Task PayoutPoolBalancesAsync(PoolConfig pool, IPayoutHandler handler)
@@ -185,8 +180,7 @@ namespace MiningCore.Payments
 
         private Task NotifyPayoutFailureAsync(Balance[] balances, PoolConfig pool, Exception ex)
         {
-            if (clusterConfig.Notifications?.Admin?.Enabled == true)
-                notificationService.NotifyAdmin("Payout Failure Notification", $"Failed to pay out {balances.Sum(x => x.Amount)} {pool.Coin.Type} from pool {pool.Id}: {ex.Message}");
+            notificationService.NotifyPaymentFailure(pool.Id, balances.Sum(x => x.Amount), ex.Message);
 
             return Task.FromResult(true);
         }
@@ -210,7 +204,7 @@ namespace MiningCore.Payments
 
             // get combined diff of all shares for block
             var accumulatedShareDiffForBlock = cf.Run(con =>
-                shareRepo.GetAccumulatedShareDifficultyBetween(con, pool.Id, from, to));
+                shareRepo.GetAccumulatedShareDifficultyBetweenCreated(con, pool.Id, from, to));
 
             // handler has the final say
             if (accumulatedShareDiffForBlock.HasValue)
